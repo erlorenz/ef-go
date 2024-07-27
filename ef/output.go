@@ -6,12 +6,12 @@ import (
 	"net/http"
 )
 
-// JSON returns an Output and nil error for a JSON response.
-func JSON(code int, body any) (Output, error) {
+// JSON writes a JSON response and returns a nil error.
+func JSON(w http.ResponseWriter, code int, body any) error {
 	envelope := map[string]any{"data": body}
 	b, err := json.Marshal(envelope)
 	if err != nil {
-		return Output{}, Error{
+		return Error{
 			error:   err,
 			Code:    http.StatusInternalServerError,
 			Type:    contentTypeJSON,
@@ -19,18 +19,18 @@ func JSON(code int, body any) (Output, error) {
 		}
 	}
 
-	return Output{
-		ContentType: contentTypeJSON,
-		Code:        code,
-		Body:        b,
-	}, nil
+	w.Header().Set("Content-Type", contentTypeJSON)
+	w.WriteHeader(code)
+	w.Write(b)
+	return nil
 }
 
-// HTML returns the Output and nil error for an HTML response.
-func HTML(code int, body string) (Output, error) {
-	return Output{
-		ContentType: contentTypeHTML,
-		Code:        code,
-		Body:        []byte(body),
-	}, nil
+// HTML writes an HTML resoponse and returns a nil error.
+func HTML(w http.ResponseWriter, code int, body string) error {
+
+	w.Header().Set("Content-Type", contentTypeHTML)
+	w.WriteHeader(code)
+	w.Write([]byte(body))
+
+	return nil
 }

@@ -5,47 +5,44 @@ import (
 	"fmt"
 )
 
-func errorBody(contentType, message string) []byte {
-	switch contentType {
-	case contentTypeJSON:
-		return marshalErrorMessage(message)
-	case contentTypeHTML:
-		return generateErrorHTML(message)
-	default:
-		return marshalErrorMessage(message)
-	}
+// Error implements the Error interface and can be used by the ef.HandlerFunc
+// to write an error response.
+type Error struct {
+	error   error
+	Body    []byte
+	Code    int
+	Type    string
+	Message string
 }
 
-type errorJSON struct {
-	Error string `json:"error"`
+func (e Error) Error() string {
+	return fmt.Sprintf("status %d: %s", e.Code, e.error.Error())
 }
 
-func marshalErrorMessage(message string) []byte {
-	data := errorJSON{Error: message}
-	b, err := json.Marshal(data)
+// ErrorJSON builds an Error that will be sent as JSON.
+// It will be in the format {"error": "<message>"}.
+func ErrorJSON(err error, code int, message string) Error {
+	bodyData := map[string]string{"error": message}
+	b, err := json.Marshal(bodyData)
 	if err != nil {
-		return []byte("Internal server error.")
+		b = []byte(`{"error":"Internal server error"}`)
 	}
-	return b
-}
 
-func generateErrorHTML(message string) []byte {
-	html := fmt.Sprintf(`<h1>%s</h1>`, message)
-	return []byte(html)
-}
-
-func ErrorJSON(err error, code int, message string) (Output, error) {
-	return Output{}, Error{
+	return Error{
 		error:   err,
+		Body:    b,
 		Code:    code,
 		Type:    contentTypeJSON,
 		Message: message,
 	}
 }
 
-func ErrorHTML(err error, code int, message string) (Output, error) {
-	return Output{}, Error{
+// ErrorHTML builds an Error that will be sent as an HTML page.
+func ErrorHTML(err error, code int, message string) Error {
+	html := fmt.Sprintf(`<html><body><h1>%s</h1></body></html>`, message)
+	return Error{
 		error:   err,
+		Body:    []byte(html),
 		Code:    200,
 		Type:    contentTypeHTML,
 		Message: message,

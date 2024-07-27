@@ -1,7 +1,6 @@
 package ef
 
 import (
-	"fmt"
 	"net/http"
 )
 
@@ -9,55 +8,31 @@ const contentTypeJSON = "application/json"
 const contentTypeHTML = "text/html"
 const defaultType = contentTypeJSON
 
-// Handler returns an ef.Output and an error that is transformed into a standardized response.
-// The first argument is a context.Context as a convenience.
+// HandlerFunc returns an error that is transformed into a standardized response.
 // It implements the http.Handler interface.
-type Handler func(ctx Context, w http.ResponseWriter, r *http.Request) (Output, error)
+type HandlerFunc func(w http.ResponseWriter, r *http.Request) error
 
-// ServeHTTP calls the ef.Handler then uses the
-// ef.Output and ef.Error to write the response.
-func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	logger := getLogger(r.Context())
+// ServeHTTP calls the ef.HandlerFunc then uses the
+// ef.Error to write the response.
+// If the error is not an ef.Error it writes a default JSON response.
+func (h HandlerFunc) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	out, err := h(Context{r.Context()}, w, r)
+	err := h(w, r)
 
 	if err != nil {
-
 		switch e := err.(type) {
 		case Error:
 			w.Header().Set("Content-Type", e.Type)
 			w.WriteHeader(e.Code)
-			w.Write(errorBody(e.Type, e.Message))
-			logger.Error(e.Message, "error", e)
+			w.Write(e.Body)
 			return
 		default:
+			body := `{"error": "Internal server error."}`
 			w.Header().Set("Content-Type", defaultType)
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write(errorBody(defaultType, e.Error()))
-			logger.Error("Internal error.", "error", e)
+			w.Write([]byte(body))
 			return
 		}
 
 	}
-
-	w.Header().Set("Content-Type", out.ContentType)
-	w.WriteHeader(out.Code)
-	w.Write(out.Body)
-}
-
-type Output struct {
-	ContentType string
-	Code        int
-	Body        []byte
-}
-
-type Error struct {
-	error   error
-	Code    int
-	Type    string
-	Message string
-}
-
-func (e Error) Error() string {
-	return fmt.Sprintf("status %d: %s", e.Code, e.error.Error())
 }
